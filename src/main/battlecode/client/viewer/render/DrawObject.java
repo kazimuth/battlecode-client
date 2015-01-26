@@ -193,20 +193,29 @@ class DrawObject extends AbstractDrawObject<Animation> {
     public void draw(Graphics2D g2, boolean focused, boolean lastRow, int layer) {
 	if(layer == 0) {
 	    if (RenderConfiguration.showRangeHatch() && focused) {
-		drawRangeHatch(g2);
+	    	
+	    	
+	    	drawRangeHatch(g2);
 	    }
-	    if (info.type.isBuilding) {
+	    	// Draw supply haze
+	    	AffineTransform pushed1 = g2.getTransform();
+	    	g2.translate(getDrawX(), getDrawY());
+	    	drawSupplyHaze(g2);
+	    	g2.setTransform(pushed1); // pop
+	    // Don't draw creep, it doesn't actually mean anything (sorry devs!)
+	    /*if (info.type.isBuilding) {
 		AffineTransform pushed0 = g2.getTransform();
 		g2.translate(getDrawX(), getDrawY());
 		drawImageTransformed(g2, new AffineTransform(),
 				     (info.team == Team.A ? creepRed.image
 				      : creepBlue.image), 2);
 		g2.setTransform(pushed0); // pop
-	    }
+	    }*/
 	}
 	if(layer == 1 || (layer == 2 && info.type == RobotType.COMMANDER)) {
 	    AffineTransform pushed1 = g2.getTransform();
 	    g2.translate(getDrawX(), getDrawY());
+	    	//drawSupplyHaze(g2);
 	    drawImmediate(g2, focused, lastRow);
 	    g2.setTransform(pushed1); // pop
 	}
@@ -221,6 +230,27 @@ class DrawObject extends AbstractDrawObject<Animation> {
 	}
   }
 
+    public void drawSupplyHaze(final Graphics2D g2) {
+    	final Color supplyHaze;
+    	//final int size = (int)drawScale();
+    	if (supplyLevel == 0) {
+    		if (info.type.isBuilding) {
+    			return; // No need to draw black for buildings sans supplies
+    		} else {
+    			supplyHaze = new Color(0,0,0,0.3f);
+    		}
+    	} else {
+    		supplyHaze = new Color(1,1,1,supplyLevel < 2000? (float)(supplyLevel / 2000)/6f: 1.0f/6.0f);
+    	}
+    	
+    	g2.setPaint(supplyHaze);
+    	//g2.fillOval(-(int)size, -(int)size, (int)size * 3, (int)size * 3);
+    	final AffineTransform pushed = g2.getTransform();
+    		g2.translate(-.5, -.5);
+    		g2.fillOval(0,0,2,2);
+    	g2.setTransform(pushed);
+    }
+    
     public void drawAction(Graphics2D g2, Action a,
 			   boolean focused, boolean isHUD) {
 	switch (a.type) {
@@ -364,7 +394,8 @@ class DrawObject extends AbstractDrawObject<Animation> {
     }
     
     //add a box around robot if supply is 0
-    if(supplyLevel<1 && info.type.needsSupply() && RenderConfiguration.showSupplyIndicators()){
+    // Actually, don't, different way to do this now
+    /*if(supplyLevel<1 && info.type.needsSupply() && RenderConfiguration.showSupplyIndicators()){
     	g2.setColor(new Color(0.95f,0.95f,0.95f));
     	Rectangle2D.Float rectLeft;
     	rectLeft = new Rectangle2D.Float(0.02f,0,0.1f, 1);   	
@@ -382,7 +413,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
     	rectRight = new Rectangle2D.Float(0.68f,0.9f,0.2f,0.1f);
     	g2.fill(rectRight);
     	
-    }
+    }*/
   }
 
     public double drawScale() {
@@ -390,6 +421,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
 	    (info.type == RobotType.COMMANDER ? 3.0 : 1.0);
     }
 
+    
     public static void drawImageTransformed(Graphics2D g2, AffineTransform trans,
 				     BufferedImage im, double size) {
 	double recentering = -1 * (size - 1.0) / 2;
@@ -399,6 +431,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
 	g2.drawImage(im, trans, null);
     }
 
+    
   // draw translated to robot location
   public void drawRobotImage(Graphics2D g2) {
     // could be used for rotations or such, remember origin for rotation
@@ -409,7 +442,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
     }
     double size = drawScale();
     drawImageTransformed(g2, trans, image, size);
-
+    
     // hats
     if (RenderConfiguration.showHats()) {
       double hatscale = 1.5;

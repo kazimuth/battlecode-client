@@ -13,6 +13,7 @@
     <property name="build.encoding" value="UTF-8"/>
     <property name="build.jar" value="${basedir}/${rootname}.jar"/>
 
+    <property name="pkg.build.tmpjar" value="${basedir}/tmp.jar"/>
     <property name="pkg.build.jar" value="${basedir}/${rootname}.jar"/>
     <property name="pkg.build.dir" value="${build.dir}/classes"/>
 
@@ -130,9 +131,14 @@
 	<target name="jar"
             description="Build the jar (with dependencies included)."
             depends="compile">
-        <jar jarfile="${pkg.build.jar}" basedir="${pkg.build.dir}">
-			<zipgroupfileset dir="${lib.dir}" excludes="battlecode-*, junit-*"/>
+        <jar jarfile="${pkg.build.tmpjar}" basedir="${pkg.build.dir}">
+            <zipgroupfileset dir="${lib.dir}" excludes="battlecode-*,junit-*"/>
 		</jar>
+        <!-- Strip out META-INF to stop security exceptions. This is awful, but whatever. -->
+        <jar jarfile="${pkg.build.jar}">
+            <zipfileset src="${pkg.build.tmpjar}" excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA" />
+        </jar>
+        <delete file="${pkg.build.tmpjar}" />
     </target>
 
     <!-- ========== TESTING ========= -->

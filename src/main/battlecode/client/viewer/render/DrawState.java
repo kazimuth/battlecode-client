@@ -300,6 +300,10 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	      g2.fill(new Rectangle2D.Float(x + offset, y + offset, size, size));
 	  }
       }
+
+      // draw fog of war
+	  g2.drawImage(mapMemoryImage.getImage(),gameMap.getMapOrigin().x,gameMap.getMapOrigin().y,null);
+
       for(IndicatorDotSignal s : indicatorDots) {
         if(RenderConfiguration.showIndicatorDots(s.team)&&(focusID==-1||focusID==s.robotID)) {
             g2.setColor(new Color(s.red,s.green,s.blue));

@@ -8,7 +8,7 @@ import java.awt.geom.*;
 class EnergonTransferAnim extends Animation {
 
 	private static final Color energonColor = Color.GREEN;
-	private static final Color fluxColor = Color.MAGENTA;
+	private static final Color fluxColor = Color.WHITE;
 
     private static final GeneralPath polygon = new GeneralPath();
     private final MapLocation target;

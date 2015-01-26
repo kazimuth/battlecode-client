@@ -1,5 +1,10 @@
 package battlecode.client.viewer;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.WritableRaster;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -48,8 +53,10 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected Map<Integer, DrawObject> airUnits;
   protected Map<Integer, FluxDepositState> fluxDeposits;
   protected Set<MapLocation> encampments;
+    protected BufferedImageMapMemory mapMemoryImage;
   protected double[] teamHP = new double[2];
     protected Map<Team, DrawObject> hqs;
+    protected Map<Team, Double> teamSupplyLevels;
     protected Map<Team, Map<Integer, DrawObject>> towers
     = new EnumMap<Team, Map<Integer, DrawObject>>(Team.class); // includes dead towers
   protected int [] coreIDs = new int [2];
@@ -67,6 +74,89 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected IndicatorLineSignal [] indicatorLines = new IndicatorLineSignal [0];
     protected Map<Team, Map<RobotType, Integer>> totalRobotTypeCount = new EnumMap<Team, Map<RobotType, Integer>>(Team.class); // includes inactive buildings
 
+  // Fog of war!
+  // This uses a BufferedImage as storage for data about visibility - that way, it can just be drawn!
+  // That might cause problems if you, say, enable antialisaing, though.
+  // (This is both graphics and memory, but put it here because it cares about signals.)
+  protected final static class BufferedImageMapMemory {
+	  private final BufferedImage imageBuffer;
+	  private final MapLocation origin;
+	  private final int width, height;
+	  
+	  private static final int NOT_SEEN = Color.BLACK.getRGB();
+	  private static final int SEEN_A   = new Color(255,0,0,20).getRGB();
+	  private static final int SEEN_B   = new Color(0,0,255,20).getRGB();
+	  private static final int SEEN_BOTH = new Color(0,0,0,0).getRGB();
+	  
+	  public BufferedImageMapMemory(final MapLocation origin, final int width, final int height) {
+		  this.width = width;
+		  this.height = height;
+		  this.origin = origin;
+		  imageBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB); // Fastest type, in theory
+
+		  // Clear the image:
+		  final Graphics2D g = imageBuffer.createGraphics();
+		  g.setColor(Color.BLACK); // NOT_SEEN
+		  g.fillRect(0, 0, width, height);
+	  }
+	  
+	  public BufferedImageMapMemory(final BufferedImageMapMemory source) {
+		  this.width = source.width;
+		  this.height = source.height;
+		  this.origin = source.origin;
+
+		  // Deep copy the image buffer:
+		  {
+			  final ColorModel cm = source.imageBuffer.getColorModel();
+			  final boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
+			  final WritableRaster raster = source.imageBuffer.copyData(null);
+			  this.imageBuffer = new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+		  }
+	  }
+	  
+	  public BufferedImage getImage() {
+		  return imageBuffer;
+	  }
+	  
+	  public void rememberLocation(final Team team, final MapLocation loc, final int rsq) {
+		  final int radius = (int) Math.sqrt(rsq);
+		  final int minXPos = loc.x - radius;
+		  final int maxXPos = loc.x + radius;
+		  final int minYPos = loc.y - radius;
+		  final int maxYPos = loc.y + radius;
+
+		  for (int x = minXPos; x <= maxXPos; x++) {
+			  for (int y = minYPos; y <= maxYPos; y++) {
+				  final int dx = x - loc.x;
+				  final int dy = y - loc.y;
+				  if (dx*dx + dy*dy <= rsq) {
+					  // We care about this location
+					  final int bufferX = x - origin.x;
+					  final int bufferY = y - origin.y;
+					  
+					  if (bufferX < 0 || bufferX >= width || bufferY < 0 || bufferY >= height) {
+						  // Out of bounds, skip it
+						  continue;
+					  }
+					  
+					  final int currentColor = imageBuffer.getRGB(bufferX, bufferY);
+					  if (currentColor == NOT_SEEN) {
+						  if (team == Team.A) {
+							  imageBuffer.setRGB(bufferX, bufferY, SEEN_A);
+						  } else if (team == Team.B){
+							  imageBuffer.setRGB(bufferX, bufferY, SEEN_B);
+						  }
+					  } else if (
+							  (currentColor == SEEN_A && team == Team.B) ||
+							  (currentColor == SEEN_B && team == Team.A)
+							  ) {
+						  imageBuffer.setRGB(bufferX, bufferY, SEEN_BOTH);
+					  }
+				  }
+			  }
+		  }
+	  }
+  }
   
   protected Iterable<Map.Entry<Integer, DrawObject>> drawables =
     new Iterable<Map.Entry<Integer, DrawObject>>() {
@@ -129,6 +219,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     towers.put(Team.B, new HashMap<Integer, DrawObject>());
     totalRobotTypeCount.put(Team.A, new EnumMap<RobotType, Integer>(RobotType.class));
     totalRobotTypeCount.put(Team.B, new EnumMap<RobotType, Integer>(RobotType.class));
+    teamSupplyLevels = new EnumMap<Team, Double>(Team.class);
   }
 
   protected synchronized void copyStateFrom(AbstractDrawState<DrawObject> src) {
@@ -191,6 +282,11 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
       
       totalRobotTypeCount.put(Team.A, new EnumMap<RobotType, Integer>(src.totalRobotTypeCount.get(Team.A)));
       totalRobotTypeCount.put(Team.B, new EnumMap<RobotType, Integer>(src.totalRobotTypeCount.get(Team.B)));
+      
+      teamSupplyLevels.put(Team.A, src.teamSupplyLevels.get(Team.A));
+      teamSupplyLevels.put(Team.B, src.teamSupplyLevels.get(Team.B));
+      
+      mapMemoryImage = new BufferedImageMapMemory(src.mapMemoryImage);
     }
 
   public DrawObject getHQ(Team t) {
@@ -299,6 +395,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   public void setGameMap(GameMap map) {
     gameMap = new GameMap(map);
     origin = gameMap.getMapOrigin();
+    mapMemoryImage = new BufferedImageMapMemory(origin, map.getWidth(), map.getHeight());
   }
 
   public GameMap getGameMap() {
@@ -406,6 +503,10 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     obj.setLocation(s.getNewLoc());
     obj.setDirection(oldloc.directionTo(s.getNewLoc()));
     obj.setMoving(s.isMovingForward(), s.getDelay());
+    
+    // Update fog o' war, things might have changed:
+    if (mapMemoryImage != null)
+    	mapMemoryImage.rememberLocation(obj.getTeam(), s.getNewLoc(), obj.getType().sensorRadiusSquared);
   }
 
   public void visitCastSignal(CastSignal s) {
@@ -445,6 +546,10 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   public void visitSpawnSignal(SpawnSignal s) {
     spawnRobot(s);
     incrementRobotTypeCount(s.getTeam(), s.getType());
+    
+    // Update fog o' war, new robot might have seen something:
+    if (mapMemoryImage != null)
+    	mapMemoryImage.rememberLocation(s.getTeam(), s.getLoc(), s.getType().sensorRadiusSquared);
   }
 
   public void visitBytecodesUsedSignal(BytecodesUsedSignal s) {
@@ -473,14 +578,26 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     double[] coreDelays = s.getCoreDelays();
     double[] weaponDelays = s.getWeaponDelays();
     double[] supplyLevels = s.getSupplyLevels();
+    
+    double teamASupplies = 0;
+    double teamBSupplies = 0;
+    
     for (int i = 0; i < robotIDs.length; i++) {
       DrawObject robot = getRobot(robotIDs[i]);
       if (robot != null) {
           robot.setMovementDelay(coreDelays[i]);
           robot.setAttackDelay(weaponDelays[i]);
           robot.setSupplyLevel(supplyLevels[i]);
+          
+          if (robot.getTeam() == Team.A) {
+        	  teamASupplies += supplyLevels[i];
+          } else {
+        	  teamBSupplies += supplyLevels[i];
+          }
       }
     }
+    teamSupplyLevels.put(Team.A, teamASupplies);
+    teamSupplyLevels.put(Team.B, teamBSupplies);
   }
 
   public void visitXPSignal(XPSignal s) {
