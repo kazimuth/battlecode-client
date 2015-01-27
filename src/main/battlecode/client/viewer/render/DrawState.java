@@ -9,7 +9,10 @@ import java.awt.geom.Rectangle2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.ArrayList;
@@ -17,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 
 import battlecode.client.util.ImageFile;
 import battlecode.client.viewer.AbstractDrawState;
@@ -49,6 +53,15 @@ public class DrawState extends AbstractDrawState<DrawObject> {
   protected static final Color linkBoth = new Color(.75f,0.f,.75f);
   protected static final ImageFile encampment = new ImageFile("art/encampment.png");
   protected static final Stroke indicatorLineStroke = new BasicStroke(0.075f);
+  
+  // For drawing fog of war.
+  // We only ever need one of these (having one for each draw state eats up memory way too fast)
+  // So make it a mutable static, as uncomfortable as that is.
+  protected static BufferedImage fogOfWarBlitImage;
+  
+  // For drawing mining animations.
+  // (ugly hack to work around MineSignals not including robotIDs.)
+  protected Set<MiningAnim> miningAnimations;
 
   private static class Factory implements GameStateFactory<DrawState> {
 
@@ -85,6 +98,7 @@ public class DrawState extends AbstractDrawState<DrawObject> {
     currentRound = -1;
     convexHullsA = new MapLocation[0][];
     convexHullsB = new MapLocation[0][];
+    miningAnimations = new HashSet<>();
  }
 
   private DrawState(GameMap map) {
@@ -96,6 +110,8 @@ public class DrawState extends AbstractDrawState<DrawObject> {
     this();
     copyStateFrom(clone);
     this.doodads = clone.doodads;
+    this.miningAnimations.clear();
+    this.miningAnimations.addAll(clone.miningAnimations);
   }
 
     public void setGameMap(GameMap map) {
@@ -283,9 +299,9 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	      }
 	      //I'm leaving the different coloring code intact in case we
 	      // think of something cool
-	      float lum = (float)(.5 * density / maxDensity + .25);
-	      lum = Math.max(Math.min(lum, 1.0f), 0.0f);
-	      lum = .75f;
+	      // float lum = (float)(.5 * density / maxDensity + .25);
+	      // lum = Math.max(Math.min(lum, 1.0f), 0.0f);
+	      float lum = .75f;
 	      float r = lum;
 	      float b = lum;
 	      float g = lum;
@@ -301,8 +317,17 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	  }
       }
 
-      // draw fog of war
-	  g2.drawImage(mapMemoryImage.getImage(),gameMap.getMapOrigin().x,gameMap.getMapOrigin().y,null);
+      // Draw fog of war
+      if (!mapMemoryImage.compatible(fogOfWarBlitImage)) {
+    	  // Our static blit buffer is the wrong size, resize it
+    	  fogOfWarBlitImage = mapMemoryImage.createCompatibleBufferedImage();
+      }
+      // Blit fog of war onto buffered image
+      // (We do this every frame instead of just storing a bufferedImage because that
+      // uses up wayyy too much memory)
+      mapMemoryImage.copyMemoryToImage(fogOfWarBlitImage);
+      // Draw, nice and simple.
+	  g2.drawImage(fogOfWarBlitImage,gameMap.getMapOrigin().x,gameMap.getMapOrigin().y,null);
 
       for(IndicatorDotSignal s : indicatorDots) {
         if(RenderConfiguration.showIndicatorDots(s.team)&&(focusID==-1||focusID==s.robotID)) {
@@ -346,6 +371,18 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	      }
 	  }
       }
+      // Now, draw mining animations
+      // (Horrible hack! see AbstractDrawState::visitMineSignal)
+      final Iterator<MiningAnim> anims = miningAnimations.iterator();
+      while (anims.hasNext()) {
+    	  final MiningAnim anim = anims.next();
+    	  anim.updateRound();
+    	  anim.draw(g2);
+    	  if (!anim.isAlive()) {
+    		  anims.remove();
+    	  }
+      }
+      
 
         /*
       AffineTransform pushed = g2.getTransform();
@@ -390,4 +427,9 @@ public class DrawState extends AbstractDrawState<DrawObject> {
       }
 
     }
+  
+  // HORRIBLE HACK
+  public void addMiningAnim(final MapLocation loc, final float oreAmount) {
+	  miningAnimations.add(new MiningAnim(loc, oreAmount, currentRound));
+  }
 }

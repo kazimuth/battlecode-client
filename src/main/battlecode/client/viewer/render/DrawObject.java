@@ -115,6 +115,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
       EnergonTransferAnim a = (EnergonTransferAnim) animations.get(ENERGON_TRANSFER);
       a.setSource(this);
     }
+    // No need to do that for mining, it doesn't move
     overallstate = copy.overallstate;
   }
 
@@ -532,6 +533,12 @@ class DrawObject extends AbstractDrawObject<Animation> {
     ExplosionAnim anim = new ExplosionAnim(((MortarAttackAnim) mortarAttackAnim).getTargetLoc(), 1.8);
     return anim;
   }
+  
+  // Unused, see AbstractDrawState::visitMineSignal
+  /*
+  public MiningAnim createMiningAnim(float oreAmount) {
+	  return new MiningAnim(this.loc, oreAmount);
+  }*/
 
   public void activateTeleporter() {
     teleportRounds = 1;

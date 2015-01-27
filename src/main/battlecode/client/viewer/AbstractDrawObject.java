@@ -108,6 +108,7 @@ public abstract class AbstractDrawObject<Animation extends AbstractAnimation> {
   public abstract Animation createMortarAttackAnim(MapLocation target);
 
   public abstract Animation createMortarExplosionAnim(Animation mortarAttackAnim);
+
   public abstract Animation createEnergonTransferAnim(MapLocation loc, float amt, boolean isFlux);
 
   protected String hats;
@@ -364,6 +365,13 @@ public abstract class AbstractDrawObject<Animation extends AbstractAnimation> {
     Animation anim = createEnergonTransferAnim(target.getLocation(),(float)amount,true);
     animations.put(ENERGON_TRANSFER,anim);
   }
+  
+  /* Unused; see AbstractDrawState::visitMineSignal
+  public void setMining(float amount) {
+	  final Animation anim = createMiningAnim(amount);
+	  animations.put(MINE, anim);
+  }
+  */
 
       public void setMoving(boolean isMovingForward, int delay) {
 	  actions.add(new Action(ActionType.MOVING, currentRound,
@@ -390,6 +398,7 @@ public abstract class AbstractDrawObject<Animation extends AbstractAnimation> {
     supplyLevel = 0;
     animations.put(DEATH_EXPLOSION, createDeathExplosionAnim(false));
     animations.remove(ENERGON_TRANSFER);
+    animations.remove(MINE);
   }
 
   public void updateRound() {

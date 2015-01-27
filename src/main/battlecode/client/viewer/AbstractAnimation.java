@@ -14,7 +14,8 @@ public abstract class AbstractAnimation implements Cloneable {
 		AURA,
 		MORTAR_ATTACK,
 		MORTAR_EXPLOSION,
-		TELEPORT;
+		TELEPORT,
+		MINE;
 	
 		public boolean shown() {
 			switch(this) {
@@ -26,6 +27,8 @@ public abstract class AbstractAnimation implements Cloneable {
 				return true;
                         case ENERGON_TRANSFER:
                           return true;
+            case MINE:
+                return true;
 			default:
 				return false;
 			}

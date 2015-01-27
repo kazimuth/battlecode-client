@@ -53,7 +53,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected Map<Integer, DrawObject> airUnits;
   protected Map<Integer, FluxDepositState> fluxDeposits;
   protected Set<MapLocation> encampments;
-    protected BufferedImageMapMemory mapMemoryImage;
+    protected DrawableMapMemory mapMemoryImage;
   protected double[] teamHP = new double[2];
     protected Map<Team, DrawObject> hqs;
     protected Map<Team, Double> teamSupplyLevels;
@@ -78,44 +78,57 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   // This uses a BufferedImage as storage for data about visibility - that way, it can just be drawn!
   // That might cause problems if you, say, enable antialisaing, though.
   // (This is both graphics and memory, but put it here because it cares about signals.)
-  protected final static class BufferedImageMapMemory {
-	  private final BufferedImage imageBuffer;
-	  private final MapLocation origin;
-	  private final int width, height;
+  protected final static class DrawableMapMemory {
+	  private final int[] buffer;
+	  public final MapLocation origin;
+	  public final int width, height;
 	  
 	  private static final int NOT_SEEN = Color.BLACK.getRGB();
 	  private static final int SEEN_A   = new Color(255,0,0,20).getRGB();
 	  private static final int SEEN_B   = new Color(0,0,255,20).getRGB();
 	  private static final int SEEN_BOTH = new Color(0,0,0,0).getRGB();
 	  
-	  public BufferedImageMapMemory(final MapLocation origin, final int width, final int height) {
+	  public DrawableMapMemory(final MapLocation origin, final int width, final int height) {
 		  this.width = width;
 		  this.height = height;
 		  this.origin = origin;
-		  imageBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB); // Fastest type, in theory
-
-		  // Clear the image:
-		  final Graphics2D g = imageBuffer.createGraphics();
-		  g.setColor(Color.BLACK); // NOT_SEEN
-		  g.fillRect(0, 0, width, height);
-	  }
-	  
-	  public BufferedImageMapMemory(final BufferedImageMapMemory source) {
-		  this.width = source.width;
-		  this.height = source.height;
-		  this.origin = source.origin;
-
-		  // Deep copy the image buffer:
-		  {
-			  final ColorModel cm = source.imageBuffer.getColorModel();
-			  final boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
-			  final WritableRaster raster = source.imageBuffer.copyData(null);
-			  this.imageBuffer = new BufferedImage(cm, raster, isAlphaPremultiplied, null);
+		  buffer = new int[width*height];
+		  
+		  for (int i = 0; i < width*height; i++) {
+			  buffer[i] = NOT_SEEN;
 		  }
 	  }
 	  
-	  public BufferedImage getImage() {
-		  return imageBuffer;
+	  public DrawableMapMemory(final DrawableMapMemory source) {
+		  this.width = source.width;
+		  this.height = source.height;
+		  this.origin = source.origin;
+		  this.buffer = new int[width*height];
+		  
+		  for (int i = 0; i < width*height; i++) {
+			  buffer[i] = source.buffer[i];
+		  }
+	  }
+	  
+	  public boolean compatible(final BufferedImage targetImage) {
+		  return targetImage != null
+				  && targetImage.getWidth() == this.width
+				  && targetImage.getHeight() == this.height
+				  && targetImage.getType() == BufferedImage.TYPE_INT_ARGB;
+	  }
+	  
+	  public BufferedImage createCompatibleBufferedImage() {
+		  return new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB); // Same color type as the array
+	  }
+	  
+	  public void copyMemoryToImage(final BufferedImage image) {
+		  image.setRGB(
+				  0, 0, 					// Start at origin
+				  this.width, this.height, 	// Cover whole image
+				  this.buffer, 			 	// The data we're blitting
+				  0,						// No offset in array
+				  this.width				// Scansize (this seems redundant...)
+				  );
 	  }
 	  
 	  public void rememberLocation(final Team team, final MapLocation loc, final int rsq) {
@@ -139,18 +152,18 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
 						  continue;
 					  }
 					  
-					  final int currentColor = imageBuffer.getRGB(bufferX, bufferY);
+					  final int currentColor = buffer[bufferY*width + bufferX];
 					  if (currentColor == NOT_SEEN) {
 						  if (team == Team.A) {
-							  imageBuffer.setRGB(bufferX, bufferY, SEEN_A);
+							  buffer[bufferY*width + bufferX] = SEEN_A;
 						  } else if (team == Team.B){
-							  imageBuffer.setRGB(bufferX, bufferY, SEEN_B);
+							  buffer[bufferY*width + bufferX] = SEEN_B;
 						  }
 					  } else if (
 							  (currentColor == SEEN_A && team == Team.B) ||
 							  (currentColor == SEEN_B && team == Team.A)
 							  ) {
-						  imageBuffer.setRGB(bufferX, bufferY, SEEN_BOTH);
+						  buffer[bufferY*width + bufferX] = SEEN_BOTH;
 					  }
 				  }
 			  }
@@ -286,7 +299,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
       teamSupplyLevels.put(Team.A, src.teamSupplyLevels.get(Team.A));
       teamSupplyLevels.put(Team.B, src.teamSupplyLevels.get(Team.B));
       
-      mapMemoryImage = new BufferedImageMapMemory(src.mapMemoryImage);
+      mapMemoryImage = new DrawableMapMemory(src.mapMemoryImage);
     }
 
   public DrawObject getHQ(Team t) {
@@ -395,7 +408,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   public void setGameMap(GameMap map) {
     gameMap = new GameMap(map);
     origin = gameMap.getMapOrigin();
-    mapMemoryImage = new BufferedImageMapMemory(origin, map.getWidth(), map.getHeight());
+    mapMemoryImage = new DrawableMapMemory(origin, map.getWidth(), map.getHeight());
   }
 
   public GameMap getGameMap() {
@@ -518,8 +531,22 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     obj.setDirection(oldloc.directionTo(s.getTargetLoc()));
   }
 
-    public void visitMineSignal(MineSignal s) {
-	return;
+  // Ugly hack, see visitMineSignal
+  	public abstract void addMiningAnim(final MapLocation loc, final float amount);
+  
+    public void visitMineSignal(final MineSignal s) {
+    	// Animate mine signals.
+    	// NOTE: this isn't done through the normal animation interface.
+    	// Why, you ask?
+    	// Because s.getMinerID() is ALWAYS 0 for some reason, and I can't seem to fix it.
+    	// TODO UPDATE to use normal animation interface if minesignals start to include ids!
+    	
+    	// Assume beavers, if type is null
+    	final RobotType type = s.getMinerType() != null? s.getMinerType() : RobotType.BEAVER;
+    	final float oreDivisor = type == RobotType.MINER? 4.0f : 20.0f;
+    	// UPDATE THIS if mining rate changes!
+    	final float oreAmount = Math.max(Math.min((float) getOreAtLocation(s.getMineLoc())/oreDivisor, 2.5f), 0.2f);
+    	addMiningAnim(s.getMineLoc(), oreAmount);
     }
 
   public DrawObject spawnRobot(SpawnSignal s) {
