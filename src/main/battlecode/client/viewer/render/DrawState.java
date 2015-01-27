@@ -317,18 +317,21 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	  }
       }
 
-      // Draw fog of war
-      if (!mapMemoryImage.compatible(fogOfWarBlitImage)) {
-    	  // Our static blit buffer is the wrong size, resize it
-    	  fogOfWarBlitImage = mapMemoryImage.createCompatibleBufferedImage();
-      }
-      // Blit fog of war onto buffered image
-      // (We do this every frame instead of just storing a bufferedImage because that
-      // uses up wayyy too much memory)
-      mapMemoryImage.copyMemoryToImage(fogOfWarBlitImage);
-      // Draw, nice and simple.
-	  g2.drawImage(fogOfWarBlitImage,gameMap.getMapOrigin().x,gameMap.getMapOrigin().y,null);
-
+		if (RenderConfiguration.showFogOfWar()) {
+			// Draw fog of war
+			if (!mapMemoryImage.compatible(fogOfWarBlitImage)) {
+				// Our static blit buffer is the wrong size, resize it
+				fogOfWarBlitImage = mapMemoryImage.createCompatibleBufferedImage();
+			}
+			// Blit fog of war onto buffered image
+			// (We do this every frame instead of just storing a bufferedImage
+			// because that uses up wayyy too much memory)
+			mapMemoryImage.copyMemoryToImage(fogOfWarBlitImage);
+			// Draw, nice and simple.
+			g2.drawImage(fogOfWarBlitImage, gameMap.getMapOrigin().x,
+					gameMap.getMapOrigin().y, null);
+		}
+      
       for(IndicatorDotSignal s : indicatorDots) {
         if(RenderConfiguration.showIndicatorDots(s.team)&&(focusID==-1||focusID==s.robotID)) {
             g2.setColor(new Color(s.red,s.green,s.blue));

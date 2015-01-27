@@ -115,6 +115,9 @@ public abstract class BaseRenderer {
     case 'V':
       RenderConfiguration.toggleIndicatorDots();
       break;
+    case 'W':
+      RenderConfiguration.toggleFogOfWar();
+      break;
     case 'X':
       RenderConfiguration.toggleExplosions();
       break;

@@ -27,6 +27,7 @@ public class RenderConfiguration {
   private static int indicatorDotToggles;
   private static boolean supplyTransfers = true;
   private static boolean supplyIndicators = true;
+  private static boolean fogOfWar = true;
 
   private static boolean tournamentMode = false;
 
@@ -54,6 +55,7 @@ public class RenderConfiguration {
   private RenderConfiguration() {}
 
   public static void toggleBroadcast() { broadcast = !broadcast; }
+  public static void toggleFogOfWar() { fogOfWar = !fogOfWar; }
   public static void toggleAttack() { attack = !attack; }
   public static void toggleActionLines() { actionlines = !actionlines; }
   public static void toggleDiscrete()  { discrete  = !discrete;  }
@@ -100,6 +102,7 @@ public class RenderConfiguration {
   public static boolean showIndicatorDots(Team t) { return ((indicatorDotToggles>>t.ordinal())&1)!=0; }
   public static boolean showSupplyTransfers() { return supplyTransfers; }
   public static boolean showSupplyIndicators() { return supplyIndicators; }
+  public static boolean showFogOfWar() { return fogOfWar; }
   
   public static boolean playAmbientMusic(){return ambientMusic;}
 
