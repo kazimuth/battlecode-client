@@ -418,8 +418,15 @@ class DrawObject extends AbstractDrawObject<Animation> {
   }
 
     public double drawScale() {
-	return info.type.isBuilding ? 1.5 :
-	    (info.type == RobotType.COMMANDER ? 3.0 : 1.0);
+    	if (info.type == RobotType.COMMANDER)
+    		return 2.0;
+    	if (info.type == RobotType.TOWER)
+    		return 2.0;
+    	if (info.type.isBuilding)
+    		return 1.5;
+    	if (info.type == RobotType.LAUNCHER)
+    		return 1.25;
+    	return 1;
     }
 
     
@@ -475,10 +482,10 @@ class DrawObject extends AbstractDrawObject<Animation> {
     if (broadcast != 0x00 && RenderConfiguration.showBroadcast()) {
       g2.setStroke(broadcastStroke);
       double drdR = visualBroadcastRadius * 0.05; // dradius/dRound
-      for (int i = 0; i < 20; i++) {
+      for (int i = 0; i < 15; i++) {
         if ((broadcast & (1 << i)) != 0x00) {
           double r = i * drdR;
-          g2.setColor(new Color(1, 0, 1, 0.05f * (20 - i)));
+          g2.setColor(new Color(1, 0, 1, 0.05f * (15 - i)));
           g2.draw(new Ellipse2D.Double(0.5 - r, 0.5 - r, 2 * r, 2 * r));
         }
       }
