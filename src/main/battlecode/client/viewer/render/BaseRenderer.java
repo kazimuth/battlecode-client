@@ -100,6 +100,9 @@ public abstract class BaseRenderer {
     case 'O':
       RenderConfiguration.toggleShowHats();
       break;
+    case 'P':
+      RenderConfiguration.toggleMineParticles();
+      break;
     case 'R':
       RenderConfiguration.toggleRangeHatch();
       break;

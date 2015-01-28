@@ -374,18 +374,20 @@ public class DrawState extends AbstractDrawState<DrawObject> {
 	      }
 	  }
       }
-      // Now, draw mining animations
-      // (Horrible hack! see AbstractDrawState::visitMineSignal)
-      final Iterator<MiningAnim> anims = miningAnimations.iterator();
-      while (anims.hasNext()) {
-    	  final MiningAnim anim = anims.next();
-    	  anim.updateRound();
-    	  anim.draw(g2);
-    	  if (!anim.isAlive()) {
-    		  anims.remove();
+
+      if (RenderConfiguration.showMineParticles()) {
+    	  // Now, draw mining animations
+    	  // (Horrible hack! see AbstractDrawState::visitMineSignal)
+    	  final Iterator<MiningAnim> anims = miningAnimations.iterator();
+    	  while (anims.hasNext()) {
+    		  final MiningAnim anim = anims.next();
+    		  anim.updateRound();
+    		  anim.draw(g2);
+    		  if (!anim.isAlive()) {
+    			  anims.remove();
+    		  }
     	  }
       }
-      
 
         /*
       AffineTransform pushed = g2.getTransform();

@@ -232,6 +232,7 @@ class DrawObject extends AbstractDrawObject<Animation> {
   }
 
     public void drawSupplyHaze(final Graphics2D g2) {
+    	if (!RenderConfiguration.showSupplyIndicators()) return;
     	final Color supplyHaze;
     	//final int size = (int)drawScale();
     	if (supplyLevel == 0) {
