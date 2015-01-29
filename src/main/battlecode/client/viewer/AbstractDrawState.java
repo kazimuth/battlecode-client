@@ -55,10 +55,11 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected Set<MapLocation> encampments;
     protected DrawableMapMemory mapMemoryImage;
   protected double[] teamHP = new double[2];
-    protected Map<Team, DrawObject> hqs;
-    protected Map<Team, Double> teamSupplyLevels;
-    protected Map<Team, Map<Integer, DrawObject>> towers
-    = new EnumMap<Team, Map<Integer, DrawObject>>(Team.class); // includes dead towers
+  protected Map<Team, Double> teamSupplyLevels;
+  protected Map<Team, DrawObject> hqs;
+  protected Map<Team, Map<Integer, DrawObject>> towers
+  = new EnumMap<Team, Map<Integer, DrawObject>>(Team.class); // includes dead towers
+  protected Map<Team, DrawObject> commanders;
   protected int [] coreIDs = new int [2];
   protected Map<MapLocation,Team> mineLocs = new HashMap<MapLocation, Team>();
   protected Map<MapLocation, Double> locationOre = new HashMap<MapLocation, Double>();
@@ -74,7 +75,6 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected IndicatorLineSignal [] indicatorLines = new IndicatorLineSignal [0];
 
   // Fog of war!
-  // This uses a BufferedImage as storage for data about visibility - that way, it can just be drawn!
   // That might cause problems if you, say, enable antialisaing, though.
   // (This is both graphics and memory, but put it here because it cares about signals.)
   protected final static class DrawableMapMemory {
@@ -173,6 +173,8 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   protected Map<Team, Map<RobotType, Integer>> totalRobotTypeCount = new EnumMap<Team, Map<RobotType, Integer>>(Team.class); // includes inactive buildings
   protected Map<Team, ArrayList<RobotType>> buildingArray = new EnumMap<Team, ArrayList<RobotType>>(Team.class);
   protected Map<Team, ArrayList<RobotType>> unitArray = new EnumMap<Team, ArrayList<RobotType>>(Team.class);
+  protected int [] teamStrength = new int[2];
+  
   
   protected Iterable<Map.Entry<Integer, DrawObject>> drawables =
     new Iterable<Map.Entry<Integer, DrawObject>>() {
@@ -231,6 +233,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
 
   public AbstractDrawState() {
     hqs = new EnumMap<Team, DrawObject>(Team.class);
+    commanders = new EnumMap<Team, DrawObject>(Team.class);
     towers.put(Team.A, new HashMap<Integer, DrawObject>());
     towers.put(Team.B, new HashMap<Integer, DrawObject>());
     totalRobotTypeCount.put(Team.A, new EnumMap<RobotType, Integer>(RobotType.class));
@@ -296,6 +299,8 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
       for (int t = 0; t < researchProgress.length; t++)
         for (int r = 0; r < researchProgress[t].length; r++)
           researchProgress[t][r] = src.researchProgress[t][r];
+      for (int x=0; x<teamStrength.length; x++)
+      	teamStrength[x] = src.teamStrength[x];
 
       indicatorDots = src.indicatorDots;
       indicatorLines = src.indicatorLines;
@@ -316,10 +321,18 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   public DrawObject getHQ(Team t) {
     return hqs.get(t);
   }
+  
+  public DrawObject getCommander(Team t){
+  	return commanders.get(t);
+  }
 	
     public Map<Integer, DrawObject> getTowers(Team t) {
 	return towers.get(t);
     }
+    
+  public int getTeamStrength(Team t){
+  	return teamStrength[t.ordinal()];
+  }
 
   public int[] getRobotCounts(Team t) {
     // naive way for now...
@@ -343,11 +356,13 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   				unitArray.get(team).add(type);
   			}
   		}
+  	teamStrength[team.ordinal()] += type.strengthWeight;
   }
   
   public void decrementRobotTypeCount(Team team, RobotType type){
   	if (type != RobotType.TOWER && type != RobotType.HQ)
   		totalRobotTypeCount.get(team).put(type, totalRobotTypeCount.get(team).get(type) - 1);
+  	teamStrength[team.ordinal()] -= type.strengthWeight;
   }
   
   public int getRobotTypeCount(Team team, RobotType type){
@@ -416,10 +431,17 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     if (hq.getType() == RobotType.HQ)
       hqs.put(hq.getTeam(),hq);
   }
+  
   protected void tryAddTower(DrawObject t) {
       if (t.getType() == RobotType.TOWER) {
 	  towers.get(t.getTeam()).put(t.getID(), t);
       }
+  }
+  
+  protected void tryAddCommander(DrawObject t){
+  	if(t.getType() == RobotType.COMMANDER){
+  		commanders.put(t.getTeam(), t);
+  	}
   }
 
 
@@ -492,7 +514,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
   }
 
   public void visitDeathSignal(DeathSignal s) {
-      DrawObject robot = getRobot(s.getObjectID());      
+     DrawObject robot = getRobot(s.getObjectID());      
     int team = robot.getTeam().ordinal();
 
     if (team < 2) {
@@ -588,6 +610,7 @@ public abstract class AbstractDrawState<DrawObject extends AbstractDrawObject> e
     putRobot(s.getRobotID(), spawn);
     tryAddHQ(spawn);
     tryAddTower(spawn);
+    tryAddCommander(spawn);
     int team = getRobot(s.getRobotID()).getTeam().ordinal();
     if (team < 2) {
       teamHP[team] += getRobot(s.getRobotID()).getEnergon();
